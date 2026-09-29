@@ -20,16 +20,16 @@ namespace SmartBuss
 
         private readonly Random random = new Random();
 
-        private readonly Color Navy = Color.FromArgb(27, 52, 77);
-        private readonly Color Blue = Color.FromArgb(47, 111, 191);
-        private readonly Color LightBlue = Color.FromArgb(239, 246, 253);
-        private readonly Color Green = Color.FromArgb(38, 126, 91);
-        private readonly Color Orange = Color.FromArgb(202, 126, 38);
-        private readonly Color Red = Color.FromArgb(181, 69, 69);
-        private readonly Color Background = Color.FromArgb(245, 247, 250);
-        private readonly Color TextDark = Color.FromArgb(40, 52, 62);
-        private readonly Color TextMuted = Color.FromArgb(105, 116, 128);
-        private readonly Color Border = Color.FromArgb(224, 229, 235);
+        private readonly Color Navy = Theme.Navy;
+        private readonly Color Blue = Theme.VividBlue;
+        private readonly Color LightBlue = Theme.LightBlue;
+        private readonly Color Green = Theme.Success;
+        private readonly Color Orange = Theme.Warning;
+        private readonly Color Red = Theme.Danger;
+        private readonly Color Background = Theme.Background;
+        private readonly Color TextDark = Theme.Text;
+        private readonly Color TextMuted = Theme.MutedText;
+        private readonly Color Border = Theme.Border;
 
         private int currentSpeed = 38;
         private int batteryLevel = 68;
@@ -78,10 +78,11 @@ namespace SmartBuss
 
         private void ConfigureForm()
         {
-            BackColor = Background;
+            BackColor = Theme.Background;
             Font = new Font("Segoe UI", 10F);
             Text = "SmartBuss - Έξυπνο Διώροφο Τουριστικό Λεωφορείο";
             StartPosition = FormStartPosition.CenterScreen;
+            MinimumSize = new Size(1050, 650);
         }
 
         private void BuildApplication()
@@ -92,7 +93,7 @@ namespace SmartBuss
             contentPanel = new Panel
             {
                 Dock = DockStyle.Fill,
-                BackColor = Background,
+                BackColor = Theme.Background,
                 Padding = new Padding(28)
             };
 
@@ -106,8 +107,17 @@ namespace SmartBuss
             Panel header = new Panel
             {
                 Dock = DockStyle.Top,
-                Height = 78,
-                BackColor = Navy
+                Height = 82,
+                BackColor = Theme.VividBlue
+            };
+
+            PictureBox logoBox = new PictureBox
+            {
+                Image = LoadApplicationImage("SmartBussLogo.png"),
+                SizeMode = PictureBoxSizeMode.Zoom,
+                BackColor = Theme.VividBlue,
+                Location = new Point(18, 10),
+                Size = new Size(86, 62)
             };
 
             Label brand = new Label
@@ -116,25 +126,25 @@ namespace SmartBuss
                 AutoSize = true,
                 ForeColor = Color.White,
                 Font = new Font("Segoe UI", 20F, FontStyle.Bold),
-                Location = new Point(25, 13)
+                Location = new Point(118, 13)
             };
 
             Label subtitle = new Label
             {
                 Text = "Έξυπνο διώροφο τουριστικό λεωφορείο",
                 AutoSize = true,
-                ForeColor = Color.FromArgb(210, 222, 236),
+                ForeColor = Color.FromArgb(225, 238, 255),
                 Font = new Font("Segoe UI", 9.5F),
-                Location = new Point(28, 47)
+                Location = new Point(121, 48)
             };
 
             connectionLabel = new Label
             {
                 Text = "● Συνδεδεμένο",
                 AutoSize = true,
-                ForeColor = Color.FromArgb(152, 221, 174),
+                ForeColor = Color.FromArgb(190, 246, 211),
                 Font = new Font("Segoe UI", 10F, FontStyle.Bold),
-                Location = new Point(970, 20)
+                Location = new Point(970, 22)
             };
 
             clockLabel = new Label
@@ -143,7 +153,7 @@ namespace SmartBuss
                 AutoSize = true,
                 ForeColor = Color.White,
                 Font = new Font("Segoe UI", 15F, FontStyle.Bold),
-                Location = new Point(1145, 26)
+                Location = new Point(1145, 27)
             };
 
             header.Resize += delegate
@@ -152,6 +162,7 @@ namespace SmartBuss
                 clockLabel.Left = header.Width - 105;
             };
 
+            header.Controls.Add(logoBox);
             header.Controls.Add(brand);
             header.Controls.Add(subtitle);
             header.Controls.Add(connectionLabel);
@@ -300,11 +311,19 @@ namespace SmartBuss
         {
             contentPanel.Controls.Clear();
 
+            if (title != "Επισκόπηση διαδρομής")
+            {
+                contentPanel.BackgroundImage = null;
+                contentPanel.BackgroundImageLayout = ImageLayout.None;
+                contentPanel.BackColor = Theme.Background;
+            }
             Label pageTitle = new Label
             {
                 Text = title,
                 AutoSize = true,
-                ForeColor = TextDark,
+                ForeColor = contentPanel.BackgroundImage != null
+                    ? Color.White
+                    : Theme.Text,
                 Font = new Font("Segoe UI", 21F, FontStyle.Bold),
                 Location = new Point(28, 20)
             };
@@ -313,7 +332,9 @@ namespace SmartBuss
             {
                 Text = subtitle,
                 AutoSize = true,
-                ForeColor = TextMuted,
+                ForeColor = contentPanel.BackgroundImage != null
+                    ? Color.White
+                    : Theme.MutedText,
                 Font = new Font("Segoe UI", 10F),
                 Location = new Point(31, 58)
             };
@@ -324,9 +345,20 @@ namespace SmartBuss
 
         private void ShowPassengerDashboard()
         {
+            contentPanel.BackgroundImage =
+                LoadApplicationImage("SmartBussBackground.png");
+
+            contentPanel.BackgroundImageLayout =
+                ImageLayout.Stretch;
+
+            contentPanel.BackColor =
+                Theme.VividBlue;
+
             PreparePage(
                 "Επισκόπηση διαδρομής",
                 "Η τρέχουσα κατάσταση του διώροφου λεωφορείου.");
+            contentPanel.BackgroundImageLayout = ImageLayout.Stretch;
+            contentPanel.BackColor = Theme.VividBlue;
 
             Panel statusCard = CreateCard(0, 100, 980, 115);
             AddCardTitle(statusCard, "Τρέχουσα διαδρομή");
@@ -2058,13 +2090,16 @@ namespace SmartBuss
             int width,
             int height)
         {
-            return new Panel
+            Panel card = new Panel
             {
                 Location = new Point(x + 28, y),
                 Size = new Size(width, height),
                 BackColor = Color.White,
-                BorderStyle = BorderStyle.FixedSingle
+                BorderStyle = BorderStyle.FixedSingle,
+                Padding = new Padding(2)
             };
+
+            return card;
         }
 
         private void AddCardTitle(
@@ -2075,7 +2110,7 @@ namespace SmartBuss
             {
                 Text = title,
                 AutoSize = true,
-                ForeColor = TextDark,
+                ForeColor = Theme.Navy,
                 Font = new Font(
                     "Segoe UI",
                     11F,
@@ -2143,7 +2178,7 @@ namespace SmartBuss
             {
                 Text = text,
                 BackColor = Color.White,
-                ForeColor = TextDark,
+                ForeColor = Theme.Text,
                 FlatStyle = FlatStyle.Flat,
                 Font = new Font("Segoe UI", 9F),
                 Cursor = Cursors.Hand,
@@ -2193,7 +2228,24 @@ namespace SmartBuss
                 return Orange;
             }
 
-            return TextDark;
+            return Theme.Text;
+        }
+        private Image LoadApplicationImage(string fileName)
+        {
+            string imagePath = System.IO.Path.Combine(
+                Application.StartupPath,
+                fileName);
+
+            if (!System.IO.File.Exists(imagePath))
+            {
+                return null;
+            }
+
+            using (Image sourceImage = Image.FromFile(imagePath))
+            {
+                return new Bitmap(sourceImage);
+            }
         }
     }
+
 }
