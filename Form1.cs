@@ -14,8 +14,8 @@ namespace SmartBuss
 
         private Timer clockTimer;
         private Timer simulationTimer;
-        private Timer robotTimer;
         private Timer orderTimer;
+        private Timer robotTimer;
 
         private readonly Random random = new Random();
 
@@ -35,21 +35,15 @@ namespace SmartBuss
         private int solarEfficiency = 74;
         private int temperature = 22;
 
-        private decimal cartTotal = 0;
-        private int nextOrderNumber = 1001;
+        private decimal cartTotal;
+        private readonly List<CartItem> cartItems =
+            new List<CartItem>();
 
-        private readonly List<CartItem> cartItems = new List<CartItem>();
-        private readonly List<Order> orders = new List<Order>();
-        private readonly List<DetectedObject> detectedObjects =
-            new List<DetectedObject>();
-        private readonly List<NotificationItem> notifications =
-            new List<NotificationItem>();
+        private OrderService orderService;
+        private RobotService robotService;
+        private NotificationService notificationService;
 
         private bool robotIsCleaning;
-        private bool robotLegsExtended;
-        private int robotProgress;
-        private int robotStep;
-        private int robotDurationSeconds;
 
         private Label robotStatusLabel;
         private Label robotLocationLabel;
@@ -64,11 +58,16 @@ namespace SmartBuss
         private CheckedListBox robotZonesCheckedListBox;
         private ListBox robotDetectedItemsListBox;
 
-        private int orderRefreshCounter;
-
         public Form1()
         {
             InitializeComponent();
+
+            orderService = new OrderService();
+            notificationService = new NotificationService();
+
+            robotService = new RobotService(batteryLevel);
+            robotService.ObjectDetected += RobotService_ObjectDetected;
+            robotService.CleaningCompleted += RobotService_CleaningCompleted;
 
             ConfigureForm();
             BuildApplication();
@@ -80,7 +79,7 @@ namespace SmartBuss
         {
             BackColor = Background;
             Font = new Font("Segoe UI", 10F);
-            Text = "SmartBuss - Έξυπνο Τουριστικό Λεωφορείο";
+            Text = "SmartBuss - Έξυπνο Διώροφο Τουριστικό Λεωφορείο";
             StartPosition = FormStartPosition.CenterScreen;
         }
 
@@ -110,7 +109,7 @@ namespace SmartBuss
                 BackColor = Navy
             };
 
-            Label brandLabel = new Label
+            Label brand = new Label
             {
                 Text = "SmartBuss",
                 AutoSize = true,
@@ -119,9 +118,9 @@ namespace SmartBuss
                 Location = new Point(25, 13)
             };
 
-            Label subtitleLabel = new Label
+            Label subtitle = new Label
             {
-                Text = "Έξυπνο τουριστικό λεωφορείο",
+                Text = "Έξυπνο διώροφο τουριστικό λεωφορείο",
                 AutoSize = true,
                 ForeColor = Color.FromArgb(210, 222, 236),
                 Font = new Font("Segoe UI", 9.5F),
@@ -134,7 +133,6 @@ namespace SmartBuss
                 AutoSize = true,
                 ForeColor = Color.FromArgb(152, 221, 174),
                 Font = new Font("Segoe UI", 10F, FontStyle.Bold),
-                Anchor = AnchorStyles.Top | AnchorStyles.Right,
                 Location = new Point(970, 20)
             };
 
@@ -144,7 +142,6 @@ namespace SmartBuss
                 AutoSize = true,
                 ForeColor = Color.White,
                 Font = new Font("Segoe UI", 15F, FontStyle.Bold),
-                Anchor = AnchorStyles.Top | AnchorStyles.Right,
                 Location = new Point(1145, 26)
             };
 
@@ -154,8 +151,8 @@ namespace SmartBuss
                 clockLabel.Left = header.Width - 105;
             };
 
-            header.Controls.Add(brandLabel);
-            header.Controls.Add(subtitleLabel);
+            header.Controls.Add(brand);
+            header.Controls.Add(subtitle);
             header.Controls.Add(connectionLabel);
             header.Controls.Add(clockLabel);
 
@@ -167,7 +164,7 @@ namespace SmartBuss
             Panel sidebar = new Panel
             {
                 Dock = DockStyle.Left,
-                Width = 210,
+                Width = 215,
                 BackColor = Color.White,
                 Padding = new Padding(14, 20, 14, 15)
             };
@@ -181,26 +178,22 @@ namespace SmartBuss
                 Location = new Point(18, 20)
             };
 
-            Button passengerButton = CreateMenuButton("Επισκόπηση");
+            Button homeButton = CreateMenuButton("Επισκόπηση");
             Button routeButton = CreateMenuButton("Διαδρομή");
             Button ordersButton = CreateMenuButton("Παραγγελίες");
             Button trackingButton = CreateMenuButton("Παρακολούθηση");
-            Button cafeButton = CreateMenuButton("Οθόνη καφετέριας");
             Button driverButton = CreateMenuButton("Οθόνη οδηγού");
             Button employeeButton = CreateMenuButton("Τεχνικός έλεγχος");
             Button robotButton = CreateMenuButton("Ρομπότ καθαρισμού");
             Button notificationsButton = CreateMenuButton("Ειδοποιήσεις");
             Button helpButton = CreateMenuButton("Βοήθεια");
 
-            int y = 55;
-
             Button[] buttons =
             {
-                passengerButton,
+                homeButton,
                 routeButton,
                 ordersButton,
                 trackingButton,
-                cafeButton,
                 driverButton,
                 employeeButton,
                 robotButton,
@@ -208,48 +201,39 @@ namespace SmartBuss
                 helpButton
             };
 
+            int y = 55;
+
             foreach (Button button in buttons)
             {
                 button.Location = new Point(14, y);
                 y += 42;
+                sidebar.Controls.Add(button);
             }
 
-            passengerButton.Click += delegate { ShowPassengerDashboard(); };
+            homeButton.Click += delegate { ShowPassengerDashboard(); };
             routeButton.Click += delegate { ShowRoutePage(); };
             ordersButton.Click += delegate { ShowOrderPage(); };
             trackingButton.Click += delegate { ShowOrderTrackingPage(); };
-            cafeButton.Click += delegate { ShowCafePage(); };
             driverButton.Click += delegate { ShowDriverPage(); };
             employeeButton.Click += delegate { ShowEmployeePage(); };
             robotButton.Click += delegate { ShowRobotPage(); };
             notificationsButton.Click += delegate { ShowNotificationsPage(); };
             helpButton.Click += delegate { ShowHelpPage(); };
 
-            Panel separator = new Panel
-            {
-                Height = 1,
-                Width = 180,
-                BackColor = Border,
-                Location = new Point(14, 520)
-            };
-
             Label busInfo = new Label
             {
-                Text = "Λεωφορείο 405\nΓραμμή: Downtown Express\nΤρέχουσα στάση: Ακρόπολη",
+                Text =
+                    "Λεωφορείο 405\n" +
+                    "Γραμμή: Downtown Express\n" +
+                    "Διώροφο όχημα\n" +
+                    "Τρέχουσα στάση: Ακρόπολη",
                 AutoSize = true,
                 ForeColor = TextMuted,
                 Font = new Font("Segoe UI", 8.5F),
-                Location = new Point(18, 540)
+                Location = new Point(18, 465)
             };
 
             sidebar.Controls.Add(menuLabel);
-
-            foreach (Button button in buttons)
-            {
-                sidebar.Controls.Add(button);
-            }
-
-            sidebar.Controls.Add(separator);
             sidebar.Controls.Add(busInfo);
 
             return sidebar;
@@ -319,7 +303,7 @@ namespace SmartBuss
         {
             PreparePage(
                 "Επισκόπηση διαδρομής",
-                "Η τρέχουσα κατάσταση του λεωφορείου και οι διαθέσιμες υπηρεσίες.");
+                "Η τρέχουσα κατάσταση του διώροφου λεωφορείου.");
 
             Panel statusCard = CreateCard(0, 100, 980, 115);
             AddCardTitle(statusCard, "Τρέχουσα διαδρομή");
@@ -362,8 +346,8 @@ namespace SmartBuss
             AddCardTitle(routeCard, "Πληροφορίες διαδρομής");
 
             Label routeMap = CreateTextLabel(
-                "Σύνταγμα  →  Ακρόπολη  →  Μουσείο\n\n" +
-                "Μουσείο  →  Εθνικός Κήπος  →  Παραλία",
+                "Κάτω όροφος: Σύνταγμα → Ακρόπολη → Μουσείο\n\n" +
+                "Πάνω όροφος: Εθνικός Κήπος → Παραλία",
                 11,
                 Blue);
             routeMap.TextAlign = ContentAlignment.MiddleCenter;
@@ -372,8 +356,8 @@ namespace SmartBuss
             routeMap.Size = new Size(430, 115);
 
             Label routeInfo = CreateTextLabel(
-                "Μπορείτε να αποβιβαστείτε και να επιστρέψετε " +
-                "με το επόμενο λεωφορείο της ίδιας γραμμής.",
+                "Το λεωφορείο διαθέτει κάτω και πάνω όροφο. " +
+                "Μπορείτε να αποβιβαστείτε σε οποιαδήποτε στάση.",
                 9.5F,
                 TextMuted);
             routeInfo.Location = new Point(22, 195);
@@ -415,7 +399,7 @@ namespace SmartBuss
 
             Label systemInfo = CreateTextLabel(
                 "Η σύνδεση με το λεωφορείο είναι ενεργή. " +
-                "Η θερμοκρασία και η διαδρομή λειτουργούν κανονικά.",
+                "Οι δύο όροφοι και τα βασικά συστήματα λειτουργούν κανονικά.",
                 10,
                 Green);
             systemInfo.Location = new Point(22, 57);
@@ -436,10 +420,10 @@ namespace SmartBuss
                 "Πληροφορίες για τα σημεία ενδιαφέροντος κοντά στις στάσεις.");
 
             Panel routeCard = CreateCard(0, 100, 980, 140);
-            AddCardTitle(routeCard, "Η διαδρομή του λεωφορείου");
+            AddCardTitle(routeCard, "Η διαδρομή του διώροφου λεωφορείου");
 
             Label route = CreateTextLabel(
-                "Σύνταγμα  →  Ακρόπολη  →  Μουσείο  →  Εθνικός Κήπος  →  Παραλία",
+                "Σύνταγμα → Ακρόπολη → Μουσείο → Εθνικός Κήπος → Παραλία",
                 12,
                 Blue);
             route.Location = new Point(24, 62);
@@ -526,51 +510,28 @@ namespace SmartBuss
         {
             PreparePage(
                 "Παραγγελία από συνεργαζόμενες καφετέριες",
-                "Επιλέξτε προϊόντα και ορίστε τη στάση παράδοσης.");
+                "Επιλέξτε προϊόντα και την επόμενη στάση παράδοσης.");
 
             Panel storesCard = CreateCard(0, 100, 620, 540);
-            AddCardTitle(storesCard, "Μενού συνεργαζόμενων καταστημάτων");
+            AddCardTitle(storesCard, "Μενού καταστημάτων");
 
-            AddProductButton(
-                storesCard, "Espresso", "Coffee & Café",
-                2.50m, 25, 65);
-
-            AddProductButton(
-                storesCard, "Cappuccino", "Coffee & Café",
-                3.20m, 25, 125);
-
-            AddProductButton(
-                storesCard, "Κρουασάν", "Coffee & Café",
-                2.80m, 25, 185);
-
-            AddProductButton(
-                storesCard, "Burger", "Fast Food Central",
-                6.50m, 315, 65);
-
-            AddProductButton(
-                storesCard, "Pizza slice", "Fast Food Central",
-                4.50m, 315, 125);
-
-            AddProductButton(
-                storesCard, "Αναψυκτικό", "Fast Food Central",
-                2.20m, 315, 185);
-
-            AddProductButton(
-                storesCard, "Chicken wrap", "Healthy Hub",
-                6.80m, 25, 275);
-
-            AddProductButton(
-                storesCard, "Smoothie", "Healthy Hub",
-                4.20m, 315, 275);
+            AddProductButton(storesCard, "Espresso", "Coffee & Café", 2.50m, 25, 65);
+            AddProductButton(storesCard, "Cappuccino", "Coffee & Café", 3.20m, 25, 125);
+            AddProductButton(storesCard, "Κρουασάν", "Coffee & Café", 2.80m, 25, 185);
+            AddProductButton(storesCard, "Burger", "Fast Food Central", 6.50m, 315, 65);
+            AddProductButton(storesCard, "Pizza slice", "Fast Food Central", 4.50m, 315, 125);
+            AddProductButton(storesCard, "Αναψυκτικό", "Fast Food Central", 2.20m, 315, 185);
+            AddProductButton(storesCard, "Chicken wrap", "Healthy Hub", 6.80m, 25, 275);
+            AddProductButton(storesCard, "Smoothie", "Healthy Hub", 4.20m, 315, 275);
 
             Label note = CreateTextLabel(
-                "Τα καταστήματα ενημερώνονται αυτόματα όταν ολοκληρώσετε την παραγγελία.",
+                "Η πληρωμή γίνεται με εικονική κάρτα. " +
+                "Η κατάσταση της παραγγελίας ενημερώνεται αυτόματα.",
                 9,
                 TextMuted);
             note.Location = new Point(25, 475);
             note.MaximumSize = new Size(560, 35);
             note.AutoSize = true;
-
             storesCard.Controls.Add(note);
 
             Panel cartCard = CreateCard(645, 100, 335, 540);
@@ -596,21 +557,17 @@ namespace SmartBuss
                 Location = new Point(20, 360)
             };
 
-            Button checkoutButton = CreatePrimaryButton(
-                "Συνέχεια στην πληρωμή");
+            Button checkoutButton = CreatePrimaryButton("Συνέχεια στην πληρωμή");
             checkoutButton.Location = new Point(20, 410);
             checkoutButton.Size = new Size(290, 42);
-
             checkoutButton.Click += delegate
             {
                 CheckoutOrder(itemsPanel, totalLabel);
             };
 
-            Button clearButton = CreateSecondaryButton(
-                "Καθαρισμός καλαθιού");
+            Button clearButton = CreateSecondaryButton("Καθαρισμός καλαθιού");
             clearButton.Location = new Point(20, 465);
             clearButton.Size = new Size(290, 35);
-
             clearButton.Click += delegate
             {
                 cartItems.Clear();
@@ -750,7 +707,7 @@ namespace SmartBuss
                     Label itemLabel = CreateTextLabel(
                         item.Name + "  x" + item.Quantity + "\n" +
                         item.Store + "  •  " +
-                        (item.Price * item.Quantity).ToString("0.00") + " €",
+                        item.Subtotal.ToString("0.00") + " €",
                         8.5F,
                         TextDark);
                     itemLabel.Location = new Point(8, 7);
@@ -815,31 +772,21 @@ namespace SmartBuss
                 return;
             }
 
-            Order order = new Order
-            {
-                Number = nextOrderNumber++,
-                Store = cartItems[0].Store,
-                DeliveryStop = deliveryStop,
-                Status = "Νέα παραγγελία",
-                CreatedAt = DateTime.Now,
-                Total = cartTotal,
-                Items = cartItems
-                    .Select(item => item.Name + " x" + item.Quantity)
-                    .ToList()
-            };
+            Order order = orderService.CreateOrder(
+                new List<CartItem>(cartItems),
+                deliveryStop);
 
-            orders.Add(order);
-
-            AddNotification(
-                "Νέα παραγγελία #" + order.Number,
-                "Η παραγγελία στάλθηκε στη " + order.Store + ".",
+            notificationService.Add(
+                "Παραγγελία #" + order.Number,
+                "Η παραγγελία βρίσκεται σε επεξεργασία από τη " +
+                order.Store + ".",
                 NotificationPriority.Normal);
 
             MessageBox.Show(
                 "Η παραγγελία #" + order.Number +
                 " καταχωρήθηκε επιτυχώς.\n\n" +
                 "Κατάστημα: " + order.Store + "\n" +
-                "Παράδοση: στάση " + order.DeliveryStop + "\n" +
+                "Παράδοση: " + order.DeliveryStop + "\n" +
                 "Σύνολο: " + order.Total.ToString("0.00") + " €",
                 "Επιτυχής παραγγελία",
                 MessageBoxButtons.OK,
@@ -961,7 +908,8 @@ namespace SmartBuss
                 paymentForm.Controls.Add(payButton);
                 paymentForm.Controls.Add(cancelButton);
 
-                return paymentForm.ShowDialog(this) == DialogResult.OK;
+                return paymentForm.ShowDialog(this) ==
+                       DialogResult.OK;
             }
         }
 
@@ -970,7 +918,7 @@ namespace SmartBuss
             using (Form stopForm = new Form())
             {
                 stopForm.Text = "Στάση παράδοσης";
-                stopForm.Size = new Size(400, 245);
+                stopForm.Size = new Size(420, 260);
                 stopForm.StartPosition = FormStartPosition.CenterParent;
                 stopForm.FormBorderStyle = FormBorderStyle.FixedDialog;
                 stopForm.MaximizeBox = false;
@@ -978,9 +926,9 @@ namespace SmartBuss
 
                 Label description = new Label
                 {
-                    Text = "Επιλέξτε την επόμενη στάση όπου θα παραδοθεί η παραγγελία.",
+                    Text = "Επιλέξτε την επόμενη διαθέσιμη στάση.",
                     AutoSize = false,
-                    Width = 330,
+                    Width = 350,
                     Height = 42,
                     Location = new Point(25, 22)
                 };
@@ -988,23 +936,22 @@ namespace SmartBuss
                 ComboBox stops = new ComboBox
                 {
                     Location = new Point(25, 82),
-                    Width = 330,
+                    Width = 350,
                     DropDownStyle = ComboBoxStyle.DropDownList
                 };
 
-                stops.Items.Add("Ακρόπολη");
-                stops.Items.Add("Μουσείο");
-                stops.Items.Add("Εθνικός Κήπος");
-                stops.Items.Add("Παραλιακή Ζώνη");
+                stops.Items.Add("Ακρόπολη - επόμενη στάση");
+                stops.Items.Add("Μουσείο - μεθεπόμενη στάση");
+                stops.Items.Add("Εθνικός Κήπος - επόμενη διαθέσιμη στάση");
                 stops.SelectedIndex = 0;
 
                 Button okButton = CreatePrimaryButton("Επιβεβαίωση");
-                okButton.Location = new Point(25, 140);
-                okButton.Size = new Size(145, 38);
+                okButton.Location = new Point(25, 145);
+                okButton.Size = new Size(150, 38);
 
                 Button cancelButton = CreateSecondaryButton("Άκυρο");
-                cancelButton.Location = new Point(205, 140);
-                cancelButton.Size = new Size(145, 38);
+                cancelButton.Location = new Point(210, 145);
+                cancelButton.Size = new Size(150, 38);
 
                 okButton.Click += delegate
                 {
@@ -1034,10 +981,12 @@ namespace SmartBuss
         {
             PreparePage(
                 "Παρακολούθηση παραγγελιών",
-                "Δείτε την κατάσταση των παραγγελιών που έχουν καταχωρηθεί.");
+                "Η κατάσταση ενημερώνεται αυτόματα κάθε 10 δευτερόλεπτα.");
 
-            Panel ordersCard = CreateCard(0, 100, 980, 500);
+            Panel ordersCard = CreateCard(0, 100, 980, 520);
             AddCardTitle(ordersCard, "Οι παραγγελίες σας");
+
+            IReadOnlyList<Order> orders = orderService.GetAll();
 
             if (orders.Count == 0)
             {
@@ -1068,7 +1017,10 @@ namespace SmartBuss
                         "#" + order.Number + "  " + order.Store,
                         10.5F,
                         TextDark);
-                    orderLabel.Font = new Font("Segoe UI", 10.5F, FontStyle.Bold);
+                    orderLabel.Font = new Font(
+                        "Segoe UI",
+                        10.5F,
+                        FontStyle.Bold);
                     orderLabel.Location = new Point(12, 10);
                     orderLabel.AutoSize = true;
 
@@ -1094,127 +1046,22 @@ namespace SmartBuss
                     ordersCard.Controls.Add(row);
 
                     y += 95;
+
+                    if (y > 475)
+                    {
+                        break;
+                    }
                 }
             }
 
             contentPanel.Controls.Add(ordersCard);
         }
 
-        private void ShowCafePage()
-        {
-            PreparePage(
-                "Οθόνη συνεργαζόμενης καφετέριας",
-                "Ο υπάλληλος βλέπει και διαχειρίζεται τις παραγγελίες του λεωφορείου.");
-
-            Panel cafeCard = CreateCard(0, 100, 980, 535);
-            AddCardTitle(cafeCard, "Εισερχόμενες παραγγελίες");
-
-            if (orders.Count == 0)
-            {
-                Label empty = CreateTextLabel(
-                    "Δεν υπάρχουν νέες παραγγελίες.",
-                    10,
-                    TextMuted);
-                empty.Location = new Point(25, 70);
-                empty.AutoSize = true;
-                cafeCard.Controls.Add(empty);
-            }
-            else
-            {
-                int y = 65;
-
-                foreach (Order order in orders)
-                {
-                    Panel row = new Panel
-                    {
-                        Width = 900,
-                        Height = 120,
-                        Location = new Point(22, y),
-                        BackColor = Color.White,
-                        BorderStyle = BorderStyle.FixedSingle
-                    };
-
-                    Label title = CreateTextLabel(
-                        "Παραγγελία #" + order.Number +
-                        "  •  " + order.Store,
-                        10.5F,
-                        TextDark);
-                    title.Font = new Font("Segoe UI", 10.5F, FontStyle.Bold);
-                    title.Location = new Point(12, 10);
-                    title.AutoSize = true;
-
-                    Label items = CreateTextLabel(
-                        "Προϊόντα: " + string.Join(", ", order.Items),
-                        8.8F,
-                        TextMuted);
-                    items.Location = new Point(12, 38);
-                    items.MaximumSize = new Size(560, 35);
-                    items.AutoSize = true;
-
-                    Label stop = CreateTextLabel(
-                        "Παράδοση στη στάση: " + order.DeliveryStop,
-                        9.5F,
-                        Blue);
-                    stop.Location = new Point(12, 80);
-                    stop.AutoSize = true;
-
-                    ComboBox statusBox = new ComboBox
-                    {
-                        Location = new Point(650, 18),
-                        Width = 210,
-                        DropDownStyle = ComboBoxStyle.DropDownList
-                    };
-
-                    statusBox.Items.Add("Νέα παραγγελία");
-                    statusBox.Items.Add("Σε προετοιμασία");
-                    statusBox.Items.Add("Έτοιμη");
-                    statusBox.Items.Add("Καθ’ οδόν");
-                    statusBox.Items.Add("Παραδόθηκε");
-
-                    int selectedIndex = statusBox.Items.IndexOf(order.Status);
-                    statusBox.SelectedIndex = selectedIndex >= 0
-                        ? selectedIndex
-                        : 0;
-
-                    Button updateButton = CreatePrimaryButton("Ενημέρωση");
-                    updateButton.Location = new Point(650, 65);
-                    updateButton.Size = new Size(125, 34);
-
-                    updateButton.Click += delegate
-                    {
-                        order.Status = statusBox.SelectedItem.ToString();
-
-                        AddNotification(
-                            "Ενημέρωση παραγγελίας #" + order.Number,
-                            "Νέα κατάσταση: " + order.Status,
-                            NotificationPriority.Normal);
-
-                        MessageBox.Show(
-                            "Η κατάσταση της παραγγελίας ενημερώθηκε.",
-                            "Καφετέρια",
-                            MessageBoxButtons.OK,
-                            MessageBoxIcon.Information);
-                    };
-
-                    row.Controls.Add(title);
-                    row.Controls.Add(items);
-                    row.Controls.Add(stop);
-                    row.Controls.Add(statusBox);
-                    row.Controls.Add(updateButton);
-                    cafeCard.Controls.Add(row);
-
-                    y += 135;
-                }
-            }
-
-            contentPanel.Controls.Add(cafeCard);
-        }
-
         private void ShowDriverPage()
         {
             PreparePage(
                 "Πίνακας οδηγού",
-                "Παρακολούθηση πορείας, ασφάλειας και ενημερώσεων.");
+                "Παρακολούθηση πορείας, ασφάλειας και αποβίβασης επιβατών.");
 
             Panel speedCard = CreateCard(0, 100, 310, 190);
             AddCardTitle(speedCard, "Πορεία");
@@ -1235,7 +1082,7 @@ namespace SmartBuss
             speedCard.Controls.Add(speedInfo);
 
             Panel safetyCard = CreateCard(330, 100, 310, 190);
-            AddCardTitle(safetyCard, "Ασφάλεια");
+            AddCardTitle(safetyCard, "Ασφάλεια θυρών");
 
             Label safety = CreateTextLabel(
                 "Πόρτες: Κλειστές",
@@ -1292,14 +1139,14 @@ namespace SmartBuss
             climateCard.Controls.Add(temp);
             climateCard.Controls.Add(tempBar);
 
-            Panel alertsCard = CreateCard(0, 315, 980, 150);
+            Panel alertsCard = CreateCard(0, 315, 980, 205);
             AddCardTitle(alertsCard, "Ειδοποιήσεις οδήγησης");
 
             Label alerts = CreateTextLabel(
                 currentSpeed > 50
                     ? "ΠΡΟΕΙΔΟΠΟΙΗΣΗ: Υπέρβαση ορίου ταχύτητας."
                     : "Δεν υπάρχουν ενεργές προειδοποιήσεις.",
-                currentSpeed > 50 ? 10 : 10,
+                10,
                 currentSpeed > 50 ? Red : Green);
             alerts.Location = new Point(22, 62);
             alerts.AutoSize = true;
@@ -1309,7 +1156,7 @@ namespace SmartBuss
                 Text = "Παρακολούθηση λωρίδας",
                 Checked = true,
                 AutoSize = true,
-                Location = new Point(22, 95)
+                Location = new Point(22, 100)
             };
 
             CheckBox fatigueCheck = new CheckBox
@@ -1317,12 +1164,37 @@ namespace SmartBuss
                 Text = "Έλεγχος κόπωσης οδηγού",
                 Checked = true,
                 AutoSize = true,
-                Location = new Point(230, 95)
+                Location = new Point(230, 100)
+            };
+
+            CheckBox passengerCheck = new CheckBox
+            {
+                Text = "Παρακολούθηση αποβίβασης",
+                Checked = true,
+                AutoSize = true,
+                Location = new Point(22, 140)
+            };
+
+            Button exitButton = CreateSecondaryButton(
+                "Έλεγχος αποβίβασης");
+            exitButton.Location = new Point(310, 135);
+            exitButton.Size = new Size(180, 35);
+
+            exitButton.Click += delegate
+            {
+                MessageBox.Show(
+                    "Υπάρχουν επιβάτες που αποβιβάζονται. " +
+                    "Οι πόρτες παραμένουν ανοικτές.",
+                    "Έλεγχος αποβίβασης",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Warning);
             };
 
             alertsCard.Controls.Add(alerts);
             alertsCard.Controls.Add(laneCheck);
             alertsCard.Controls.Add(fatigueCheck);
+            alertsCard.Controls.Add(passengerCheck);
+            alertsCard.Controls.Add(exitButton);
 
             contentPanel.Controls.Add(speedCard);
             contentPanel.Controls.Add(safetyCard);
@@ -1362,7 +1234,7 @@ namespace SmartBuss
             energyCard.Controls.Add(solarInfo);
             energyCard.Controls.Add(battery);
 
-            Panel roofCard = CreateCard(330, 100, 310, 220);
+            Panel roofCard = CreateCard(330, 100, 310, 270);
             AddCardTitle(roofCard, "Ρυθμιζόμενη οροφή");
 
             Label roofStatus = CreateTextLabel(
@@ -1373,12 +1245,17 @@ namespace SmartBuss
             roofStatus.AutoSize = true;
 
             Button openButton = CreatePrimaryButton("Άνοιγμα");
-            openButton.Location = new Point(22, 120);
+            openButton.Location = new Point(22, 115);
             openButton.Size = new Size(110, 38);
 
             Button closeButton = CreateSecondaryButton("Κλείσιμο");
-            closeButton.Location = new Point(145, 120);
+            closeButton.Location = new Point(145, 115);
             closeButton.Size = new Size(110, 38);
+
+            Button automaticButton = CreatePrimaryButton(
+                "Αυτόματη ρύθμιση");
+            automaticButton.Location = new Point(22, 175);
+            automaticButton.Size = new Size(180, 38);
 
             openButton.Click += delegate
             {
@@ -1392,28 +1269,45 @@ namespace SmartBuss
                 roofStatus.ForeColor = TextMuted;
             };
 
+            automaticButton.Click += delegate
+            {
+                roofStatus.Text = "Κατάσταση: Ανοιχτή";
+                roofStatus.ForeColor = Green;
+
+                MessageBox.Show(
+                    "Ο καιρός είναι καλός. " +
+                    "Η οροφή παραμένει ανοιχτή.",
+                    "Αυτόματη ρύθμιση οροφής",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Information);
+            };
+
             roofCard.Controls.Add(roofStatus);
             roofCard.Controls.Add(openButton);
             roofCard.Controls.Add(closeButton);
+            roofCard.Controls.Add(automaticButton);
 
-            Panel systemCard = CreateCard(660, 100, 320, 220);
-            AddCardTitle(systemCard, "Συστήματα");
+            Panel systemsCard = CreateCard(660, 100, 320, 270);
+            AddCardTitle(systemsCard, "Συστήματα");
 
             Label systemStatus = CreateTextLabel(
-                "Κλιματισμός: Ενεργός\nΦωτισμός: Ενεργός\nΣύνδεση αισθητήρων: Ενεργή",
+                "Κλιματισμός: Ενεργός\n" +
+                "Φωτισμός: Ενεργός\n" +
+                "Αισθητήρες: Ενεργοί\n" +
+                "Αριθμός ορόφων: 2",
                 10,
                 Green);
             systemStatus.Location = new Point(22, 65);
             systemStatus.AutoSize = true;
 
-            systemCard.Controls.Add(systemStatus);
+            systemsCard.Controls.Add(systemStatus);
 
-            Panel reportCard = CreateCard(0, 350, 980, 145);
+            Panel reportCard = CreateCard(0, 400, 980, 145);
             AddCardTitle(reportCard, "Τελευταίος τεχνικός έλεγχος");
 
             Label report = CreateTextLabel(
-                "Όλα τα βασικά συστήματα λειτουργούν κανονικά.\n" +
-                "Τελευταία ενημέρωση: πριν από 2 λεπτά.",
+                "Τα βασικά συστήματα λειτουργούν κανονικά.\n" +
+                "Η οροφή ρυθμίζεται σύμφωνα με τις καιρικές συνθήκες.",
                 10,
                 TextMuted);
             report.Location = new Point(22, 62);
@@ -1423,7 +1317,7 @@ namespace SmartBuss
 
             contentPanel.Controls.Add(energyCard);
             contentPanel.Controls.Add(roofCard);
-            contentPanel.Controls.Add(systemCard);
+            contentPanel.Controls.Add(systemsCard);
             contentPanel.Controls.Add(reportCard);
         }
 
@@ -1431,7 +1325,7 @@ namespace SmartBuss
         {
             PreparePage(
                 "Ρομπότ καθαρισμού",
-                "Επιλέξτε περιοχή, μέθοδο και διάρκεια καθαρισμού.");
+                "Επιλέξτε περιοχή, σημεία, μέθοδο και διάρκεια καθαρισμού.");
 
             Panel optionsCard = CreateCard(0, 100, 420, 500);
             AddCardTitle(optionsCard, "Ρυθμίσεις αποστολής");
@@ -1451,10 +1345,10 @@ namespace SmartBuss
             };
 
             robotAreaComboBox.Items.Add("Όλο το λεωφορείο");
-            robotAreaComboBox.Items.Add("Ισόγειο");
-            robotAreaComboBox.Items.Add("1ος όροφος");
-            robotAreaComboBox.Items.Add("2ος όροφος");
+            robotAreaComboBox.Items.Add("Κάτω όροφος");
+            robotAreaComboBox.Items.Add("Πάνω όροφος");
             robotAreaComboBox.Items.Add("Περιοχή οδηγού");
+            robotAreaComboBox.Items.Add("Σκάλα μεταξύ ορόφων");
             robotAreaComboBox.SelectedIndex = 0;
 
             Label methodLabel = CreateTextLabel(
@@ -1511,30 +1405,21 @@ namespace SmartBuss
                 CheckOnClick = true
             };
 
-            robotZonesCheckedListBox.Items.Add("Καθίσματα");
+            robotZonesCheckedListBox.Items.Add("Καθίσματα κάτω ορόφου");
+            robotZonesCheckedListBox.Items.Add("Καθίσματα πάνω ορόφου");
             robotZonesCheckedListBox.Items.Add("Διάδρομοι");
-            robotZonesCheckedListBox.Items.Add("Σκαλοπάτια");
+            robotZonesCheckedListBox.Items.Add("Σκάλα");
             robotZonesCheckedListBox.Items.Add("Περιοχή οδηγού");
 
-            Button startButton = CreatePrimaryButton(
-                "Έναρξη αποστολής");
+            Button startButton = CreatePrimaryButton("Έναρξη αποστολής");
             startButton.Location = new Point(22, 425);
             startButton.Size = new Size(160, 40);
+            startButton.Click += delegate { StartRobotCleaning(); };
 
-            Button stopButton = CreateSecondaryButton(
-                "Παύση");
+            Button stopButton = CreateSecondaryButton("Παύση");
             stopButton.Location = new Point(195, 425);
             stopButton.Size = new Size(105, 40);
-
-            startButton.Click += delegate
-            {
-                StartRobotCleaning();
-            };
-
-            stopButton.Click += delegate
-            {
-                StopRobotCleaning();
-            };
+            stopButton.Click += delegate { StopRobotCleaning(); };
 
             optionsCard.Controls.Add(areaLabel);
             optionsCard.Controls.Add(robotAreaComboBox);
@@ -1596,7 +1481,7 @@ namespace SmartBuss
             };
 
             Label detectedTitle = CreateTextLabel(
-                "Αναγνωρισμένα αντικείμενα",
+                "Αναγνωρισμένο αντικείμενο",
                 10,
                 TextDark);
             detectedTitle.Font = new Font("Segoe UI", 10F, FontStyle.Bold);
@@ -1632,10 +1517,10 @@ namespace SmartBuss
             contentPanel.Controls.Add(optionsCard);
             contentPanel.Controls.Add(statusCard);
 
-            InitializeRobotControls();
+            InitializeRobotTimer();
         }
 
-        private void InitializeRobotControls()
+        private void InitializeRobotTimer()
         {
             if (robotTimer != null)
             {
@@ -1653,56 +1538,47 @@ namespace SmartBuss
 
         private void StartRobotCleaning()
         {
-            if (robotAreaComboBox == null ||
-                robotMethodComboBox == null ||
-                robotDurationComboBox == null ||
-                robotProgressBar == null)
-            {
-                return;
-            }
-
-            robotIsCleaning = true;
-            robotLegsExtended = true;
-            robotProgress = 0;
-            robotStep = 0;
+            int durationSeconds;
 
             if (robotDurationComboBox.SelectedIndex == 0)
             {
-                robotDurationSeconds = 30;
+                durationSeconds = 30;
             }
             else if (robotDurationComboBox.SelectedIndex == 1)
             {
-                robotDurationSeconds = 60;
+                durationSeconds = 60;
             }
             else
             {
-                robotDurationSeconds = 90;
+                durationSeconds = 90;
             }
 
-            robotProgressBar.Value = 0;
+            robotService.StartCleaning(
+                robotAreaComboBox.SelectedItem.ToString(),
+                robotMethodComboBox.SelectedItem.ToString(),
+                GetSelectedCleaningZones(),
+                durationSeconds);
 
+            robotIsCleaning = true;
+
+            robotProgressBar.Value = 0;
             robotStatusLabel.Text = "Κατάσταση: Ανάπτυξη ποδιών";
             robotStatusLabel.ForeColor = Blue;
-
-            robotLocationLabel.Text =
-                "Θέση: Είσοδος λεωφορείου";
-
-            robotLegsLabel.Text =
-                "Πόδια: Αναπτυγμένα";
-
-            robotBatteryLabel.Text =
-                "Μπαταρία: " + batteryLevel + "%";
-
-            robotTimeLabel.Text =
-                "Χρόνος που απομένει: " +
-                robotDurationSeconds + " δευτερόλεπτα";
-
+            robotLocationLabel.Text = robotService.GetLocationDescription();
+            robotLegsLabel.Text = "Πόδια: Αναπτυγμένα";
+            robotBatteryLabel.Text = "Μπαταρία: " +
+                                     robotService.State.BatteryLevel + "%";
+            robotTimeLabel.Text = "Χρόνος που απομένει: " +
+                                  durationSeconds +
+                                  " δευτερόλεπτα";
             robotAlertLabel.Text =
                 "Οι αισθητήρες καθαρισμού ενεργοποιήθηκαν.";
+            robotAlertLabel.ForeColor = TextMuted;
 
+            robotDetectedItemsListBox.Items.Clear();
             robotTimer.Start();
 
-            AddNotification(
+            notificationService.Add(
                 "Έναρξη καθαρισμού",
                 "Το ρομπότ ξεκίνησε αποστολή στην περιοχή " +
                 robotAreaComboBox.SelectedItem + ".",
@@ -1711,155 +1587,103 @@ namespace SmartBuss
 
         private void StopRobotCleaning()
         {
+            robotService.PauseCleaning();
+            robotIsCleaning = false;
+
             if (robotTimer != null)
             {
                 robotTimer.Stop();
             }
 
-            robotIsCleaning = false;
-
-            if (robotStatusLabel != null)
-            {
-                robotStatusLabel.Text = "Κατάσταση: Σε παύση";
-                robotStatusLabel.ForeColor = Orange;
-            }
-
-            if (robotLegsLabel != null)
-            {
-                robotLegsLabel.Text =
-                    "Πόδια: " +
-                    (robotLegsExtended ? "Αναπτυγμένα" : "Μαζεμένα");
-            }
-
-            if (robotAlertLabel != null)
-            {
-                robotAlertLabel.Text =
-                    "Η αποστολή βρίσκεται σε παύση.";
-            }
+            robotStatusLabel.Text = "Κατάσταση: Σε παύση";
+            robotStatusLabel.ForeColor = Orange;
+            robotAlertLabel.Text = "Η αποστολή βρίσκεται σε παύση.";
+            robotAlertLabel.ForeColor = Orange;
         }
 
-        private void RobotTimer_Tick(object sender, EventArgs e)
+        private void RobotTimer_Tick(
+            object sender,
+            EventArgs e)
         {
             if (!robotIsCleaning)
             {
                 return;
             }
 
-            robotStep++;
+            robotService.AdvanceOneSecond();
 
-            robotProgress = Math.Min(
-                100,
-                robotProgress + 5);
+            RobotState state = robotService.State;
 
-            robotProgressBar.Value = robotProgress;
+            robotProgressBar.Value = state.Progress;
 
-            int remainingSeconds = Math.Max(
-                0,
-                robotDurationSeconds - robotStep);
+            robotStatusLabel.Text =
+                "Κατάσταση: " +
+                GetRobotStatusText(state.Status);
+
+            robotLocationLabel.Text =
+                "Θέση: " +
+                robotService.GetLocationDescription();
+
+            robotLegsLabel.Text =
+                "Πόδια: " +
+                (state.LegsExtended
+                    ? "Αναπτυγμένα"
+                    : "Μαζεμένα");
+
+            robotBatteryLabel.Text =
+                "Μπαταρία: " +
+                state.BatteryLevel + "%";
 
             robotTimeLabel.Text =
                 "Χρόνος που απομένει: " +
-                remainingSeconds + " δευτερόλεπτα";
+                state.RemainingSeconds +
+                " δευτερόλεπτα";
 
-            if (robotProgress <= 10)
+            if (state.Status == RobotStatus.Completed)
             {
-                robotStatusLabel.Text =
-                    "Κατάσταση: Ανάπτυξη ποδιών";
-
-                robotLocationLabel.Text =
-                    "Θέση: Είσοδος λεωφορείου";
-            }
-            else if (robotProgress <= 30)
-            {
-                robotStatusLabel.Text =
-                    "Κατάσταση: Μετάβαση στην περιοχή";
-
-                robotLocationLabel.Text =
-                    "Θέση: " + robotAreaComboBox.SelectedItem;
-            }
-            else if (robotProgress <= 65)
-            {
-                robotStatusLabel.Text =
-                    "Κατάσταση: Καθαρισμός σε εξέλιξη";
-
-                robotLocationLabel.Text =
-                    "Περιοχή: " +
-                    GetSelectedCleaningZones();
-            }
-            else if (robotProgress <= 90)
-            {
-                robotStatusLabel.Text =
-                    "Κατάσταση: Αναγνώριση αντικειμένων";
-
-                robotLocationLabel.Text =
-                    "Θέση: Τελικός έλεγχος χώρου";
-            }
-            else
-            {
-                robotStatusLabel.Text =
-                    "Κατάσταση: Επιστροφή στη βάση";
-
-                robotLocationLabel.Text =
-                    "Θέση: Σταθμός φόρτισης";
-            }
-
-            if (robotProgress == 35)
-            {
-                AddDetectedObject(
-                    "Διαβατήριο",
-                    "Εντοπίστηκε κάτω από κάθισμα.",
-                    NotificationPriority.High);
-            }
-
-            if (robotProgress == 55)
-            {
-                AddDetectedObject(
-                    "Κόσμημα",
-                    "Εντοπίστηκε στον διάδρομο.",
-                    NotificationPriority.High);
-            }
-
-            if (robotProgress == 75)
-            {
-                AddDetectedObject(
-                    "Χαρτονομίσματα",
-                    "Εντοπίστηκαν κοντά στη θέση 12A.",
-                    NotificationPriority.High);
-            }
-
-            if (robotProgress >= 100)
-            {
-                robotTimer.Stop();
                 robotIsCleaning = false;
-                robotLegsExtended = false;
+                robotTimer.Stop();
 
-                robotStatusLabel.Text =
-                    "Κατάσταση: Ολοκληρώθηκε";
                 robotStatusLabel.ForeColor = Green;
-
-                robotLocationLabel.Text =
-                    "Θέση: Σταθμός φόρτισης";
-
-                robotLegsLabel.Text =
-                    "Πόδια: Μαζεμένα";
-
-                robotTimeLabel.Text =
-                    "Χρόνος που απομένει: 0 δευτερόλεπτα";
-
                 robotAlertLabel.Text =
-                    "Ο καθαρισμός ολοκληρώθηκε και τα ευρήματα καταγράφηκαν.";
+                    "Ο καθαρισμός ολοκληρώθηκε και το εύρημα καταγράφηκε.";
+                robotAlertLabel.ForeColor = Green;
+            }
+        }
 
-                AddNotification(
-                    "Ολοκλήρωση καθαρισμού",
-                    "Το ρομπότ επέστρεψε στη βάση φόρτισης.",
-                    NotificationPriority.Normal);
+        private string GetRobotStatusText(RobotStatus status)
+        {
+            switch (status)
+            {
+                case RobotStatus.DeployingLegs:
+                    return "Ανάπτυξη ποδιών";
+
+                case RobotStatus.Moving:
+                    return "Μετάβαση στην περιοχή";
+
+                case RobotStatus.Cleaning:
+                    return "Καθαρισμός σε εξέλιξη";
+
+                case RobotStatus.DetectingObjects:
+                    return "Αναγνώριση αντικειμένων";
+
+                case RobotStatus.Returning:
+                    return "Επιστροφή στη βάση";
+
+                case RobotStatus.Paused:
+                    return "Σε παύση";
+
+                case RobotStatus.Completed:
+                    return "Ολοκληρώθηκε";
+
+                default:
+                    return "Σε αναμονή";
             }
         }
 
         private string GetSelectedCleaningZones()
         {
-            if (robotZonesCheckedListBox == null ||
-                robotZonesCheckedListBox.CheckedItems.Count == 0)
+            if (robotZonesCheckedListBox.CheckedItems.Count == 0)
             {
                 return "όλο το επιλεγμένο τμήμα";
             }
@@ -1874,50 +1698,38 @@ namespace SmartBuss
             return string.Join(", ", zones);
         }
 
-        private void AddDetectedObject(
-            string objectName,
-            string details,
-            NotificationPriority priority)
+        private void RobotService_ObjectDetected(
+            object sender,
+            DetectedObjectEventArgs e)
         {
-            DetectedObject detectedObject = new DetectedObject
-            {
-                ObjectName = objectName,
-                Details = details,
-                Floor = robotAreaComboBox == null
-                    ? "Άγνωστος χώρος"
-                    : robotAreaComboBox.SelectedItem.ToString(),
-                Time = DateTime.Now
-            };
+            DetectedObject item = e.DetectedObject;
 
-            detectedObjects.Add(detectedObject);
+            robotDetectedItemsListBox.Items.Add(
+                "[ΥΨΗΛΗ] " +
+                item.Time.ToString("HH:mm") +
+                " - " +
+                item.ObjectName +
+                " - " +
+                item.Details +
+                " Σημείο: " +
+                item.Area);
 
-            if (robotDetectedItemsListBox != null)
-            {
-                string entry =
-                    "[" + GetPriorityText(priority) + "] " +
-                    detectedObject.Time.ToString("HH:mm") +
-                    " - " +
-                    objectName +
-                    " - " +
-                    details +
-                    " Περιοχή: " +
-                    detectedObject.Floor;
+            robotAlertLabel.Text =
+                "Εντοπίστηκε αντικείμενο υψηλής σημασίας: " +
+                item.ObjectName;
+            robotAlertLabel.ForeColor = Red;
 
-                robotDetectedItemsListBox.Items.Add(entry);
-            }
+            notificationService.AddObjectNotification(item);
+        }
 
-            if (robotAlertLabel != null)
-            {
-                robotAlertLabel.Text =
-                    "Εντοπίστηκε αντικείμενο υψηλής σημασίας: " +
-                    objectName;
-                robotAlertLabel.ForeColor = Red;
-            }
-
-            AddNotification(
-                "Εντοπίστηκε " + objectName,
-                details + " Περιοχή: " + detectedObject.Floor,
-                priority);
+        private void RobotService_CleaningCompleted(
+            object sender,
+            EventArgs e)
+        {
+            notificationService.Add(
+                "Ολοκλήρωση καθαρισμού",
+                "Το ρομπότ επέστρεψε στη βάση φόρτισης.",
+                NotificationPriority.Normal);
         }
 
         private void ShowNotificationsPage()
@@ -1929,7 +1741,10 @@ namespace SmartBuss
             Panel notificationsCard = CreateCard(0, 100, 980, 520);
             AddCardTitle(notificationsCard, "Καταγεγραμμένες ειδοποιήσεις");
 
-            if (notifications.Count == 0)
+            IReadOnlyList<NotificationItem> items =
+                notificationService.GetAll();
+
+            if (items.Count == 0)
             {
                 Label empty = CreateTextLabel(
                     "Δεν υπάρχουν ειδοποιήσεις.",
@@ -1943,17 +1758,17 @@ namespace SmartBuss
             {
                 int y = 65;
 
-                foreach (NotificationItem item in notifications
-                    .OrderByDescending(notification => notification.Time))
+                foreach (NotificationItem item in items)
                 {
                     Panel row = new Panel
                     {
                         Width = 900,
                         Height = 72,
                         Location = new Point(22, y),
-                        BackColor = item.Priority == NotificationPriority.High
-                            ? Color.FromArgb(253, 242, 242)
-                            : LightBlue,
+                        BackColor =
+                            item.Priority == NotificationPriority.High
+                                ? Color.FromArgb(253, 242, 242)
+                                : LightBlue,
                         BorderStyle = BorderStyle.FixedSingle
                     };
 
@@ -1963,7 +1778,10 @@ namespace SmartBuss
                         item.Priority == NotificationPriority.High
                             ? Red
                             : TextDark);
-                    title.Font = new Font("Segoe UI", 10F, FontStyle.Bold);
+                    title.Font = new Font(
+                        "Segoe UI",
+                        10F,
+                        FontStyle.Bold);
                     title.Location = new Point(12, 9);
                     title.AutoSize = true;
 
@@ -2003,7 +1821,7 @@ namespace SmartBuss
 
             clearButton.Click += delegate
             {
-                notifications.Clear();
+                notificationService.Clear();
                 ShowNotificationsPage();
             };
 
@@ -2011,25 +1829,11 @@ namespace SmartBuss
             contentPanel.Controls.Add(clearButton);
         }
 
-        private void AddNotification(
-            string title,
-            string message,
-            NotificationPriority priority)
-        {
-            notifications.Add(new NotificationItem
-            {
-                Title = title,
-                Message = message,
-                Priority = priority,
-                Time = DateTime.Now
-            });
-        }
-
         private void ShowNavigationPage()
         {
             PreparePage(
                 "Τουριστική πλοήγηση",
-                "Βρείτε αξιοθέατα, εστιατόρια και την κοντινότερη στάση.");
+                "Βρείτε αξιοθέατα και την κοντινότερη στάση.");
 
             Panel navigationCard = CreateCard(0, 100, 980, 430);
             AddCardTitle(navigationCard, "Προορισμός");
@@ -2068,7 +1872,7 @@ namespace SmartBuss
 
             Label mapText = CreateTextLabel(
                 "Χάρτης περιοχής\n\n" +
-                "Η τρέχουσα θέση σας βρίσκεται κοντά στη στάση Ακρόπολη.",
+                "Η τρέχουσα θέση βρίσκεται κοντά στη στάση Ακρόπολη.",
                 11,
                 Blue);
             mapText.Dock = DockStyle.Fill;
@@ -2114,20 +1918,21 @@ namespace SmartBuss
                 Font = new Font("Segoe UI", 10.5F),
                 Text =
                     "Επιβάτης\n\n" +
-                    "Από την «Επισκόπηση» βλέπετε την τρέχουσα διαδρομή.\n" +
+                    "Το λεωφορείο διαθέτει κάτω και πάνω όροφο.\n" +
                     "Από τη «Διαδρομή» ενημερώνεστε για τα αξιοθέατα.\n" +
-                    "Από τις «Παραγγελίες» επιλέγετε προϊόντα από συνεργαζόμενες καφετέριες.\n" +
-                    "Η παραγγελία πληρώνεται με εικονική κάρτα και παραδίδεται σε στάση.\n\n" +
-                    "Καφετέρια\n\n" +
-                    "Ο υπάλληλος της καφετέριας βλέπει τις παραγγελίες και ενημερώνει\n" +
-                    "την κατάστασή τους από «Νέα» έως «Παραδόθηκε».\n\n" +
+                    "Από τις «Παραγγελίες» επιλέγετε προϊόντα από συνεργαζόμενα καταστήματα.\n" +
+                    "Η πληρωμή γίνεται με εικονική κάρτα και η παραγγελία\n" +
+                    "παραδίδεται σε επόμενη στάση.\n\n" +
+                    "Κατάσταση παραγγελίας\n\n" +
+                    "Η κατάσταση αλλάζει αυτόματα κάθε 10 δευτερόλεπτα:\n" +
+                    "«Σε επεξεργασία» → «Προς παράδοση» → «Παραδόθηκε».\n\n" +
                     "Ρομπότ καθαρισμού\n\n" +
-                    "Ο τεχνικός επιλέγει περιοχή, σημεία καθαρισμού, μέθοδο και χρόνο.\n" +
-                    "Το ρομπότ αναπτύσσει τα πόδια του, μετακινείται, καθαρίζει και\n" +
-                    "αναγνωρίζει αντικείμενα όπως διαβατήριο, κόσμημα και χρήματα.\n\n" +
-                    "Τα αναγνωρισμένα αντικείμενα εμφανίζονται στις «Ειδοποιήσεις».\n" +
-                    "Η λειτουργία ενημέρωσης οδηγού, εταιρείας και επιβατών\n" +
-                    "προσομοιώνεται μέσα στην εφαρμογή.\n\n" +
+                    "Ο τεχνικός επιλέγει κάτω όροφο, πάνω όροφο, περιοχή οδηγού,\n" +
+                    "σκάλα ή όλο το λεωφορείο. Επιλέγει επίσης σημεία καθαρισμού,\n" +
+                    "μέθοδο και χρόνο ολοκλήρωσης.\n" +
+                    "Το ρομπότ αναπτύσσει τα πόδια του, μετακινείται και καθαρίζει.\n" +
+                    "Σε κάθε αποστολή μπορεί να αναγνωρίσει ένα αντικείμενο αξίας.\n\n" +
+                    "Οι ειδοποιήσεις ενημερώνουν τον οδηγό, την εταιρεία και τους επιβάτες.\n\n" +
                     "Σημείωση: Η εφαρμογή είναι εκπαιδευτική προσομοίωση."
             };
 
@@ -2144,10 +1949,7 @@ namespace SmartBuss
 
             clockTimer.Tick += delegate
             {
-                if (clockLabel != null)
-                {
-                    clockLabel.Text = DateTime.Now.ToString("HH:mm");
-                }
+                clockLabel.Text = DateTime.Now.ToString("HH:mm");
             };
 
             clockTimer.Start();
@@ -2161,42 +1963,49 @@ namespace SmartBuss
             {
                 currentSpeed = random.Next(32, 54);
                 solarEfficiency = random.Next(62, 94);
+
                 batteryLevel = Math.Max(
                     35,
-                    Math.Min(100, batteryLevel + random.Next(-2, 4)));
+                    Math.Min(
+                        100,
+                        batteryLevel + random.Next(-2, 4)));
 
-                if (connectionLabel != null)
-                {
-                    connectionLabel.Text = "● Συνδεδεμένο";
-                    connectionLabel.ForeColor =
-                        Color.FromArgb(152, 221, 174);
-                }
+                connectionLabel.Text = "● Συνδεδεμένο";
+                connectionLabel.ForeColor =
+                    Color.FromArgb(152, 221, 174);
             };
 
             simulationTimer.Start();
 
             orderTimer = new Timer
             {
-                Interval = 8000
+                Interval = 10000
             };
 
             orderTimer.Tick += delegate
             {
-                orderRefreshCounter++;
+                List<OrderStatusChange> changes =
+                    orderService.AdvanceOrders();
 
-                if (orderRefreshCounter % 3 == 0)
+                foreach (OrderStatusChange change in changes)
                 {
-                    Order order = orders.FirstOrDefault(
-                        item => item.Status == "Νέα παραγγελία");
-
-                    if (order != null)
+                    if (change.NewStatus == "Προς παράδοση")
                     {
-                        order.Status = "Σε προετοιμασία";
-
-                        AddNotification(
-                            "Η καφετέρια ξεκίνησε την παραγγελία #" +
-                            order.Number,
-                            "Η παραγγελία βρίσκεται σε προετοιμασία.",
+                        notificationService.Add(
+                            "Παραγγελία #" +
+                            change.Order.Number,
+                            "Η παραγγελία είναι έτοιμη και κατευθύνεται " +
+                            "προς τη στάση " +
+                            change.Order.DeliveryStop + ".",
+                            NotificationPriority.Normal);
+                    }
+                    else if (change.NewStatus == "Παραδόθηκε")
+                    {
+                        notificationService.Add(
+                            "Παραγγελία #" +
+                            change.Order.Number,
+                            "Η παραγγελία παραδόθηκε στη στάση " +
+                            change.Order.DeliveryStop + ".",
                             NotificationPriority.Normal);
                     }
                 }
@@ -2229,7 +2038,10 @@ namespace SmartBuss
                 Text = title,
                 AutoSize = true,
                 ForeColor = TextDark,
-                Font = new Font("Segoe UI", 11F, FontStyle.Bold),
+                Font = new Font(
+                    "Segoe UI",
+                    11F,
+                    FontStyle.Bold),
                 Location = new Point(20, 18)
             };
 
@@ -2257,7 +2069,10 @@ namespace SmartBuss
             {
                 Text = text,
                 AutoSize = true,
-                Font = new Font("Segoe UI", 26F, FontStyle.Bold),
+                Font = new Font(
+                    "Segoe UI",
+                    26F,
+                    FontStyle.Bold),
                 ForeColor = color
             };
         }
@@ -2271,7 +2086,10 @@ namespace SmartBuss
                 BackColor = Blue,
                 ForeColor = Color.White,
                 FlatStyle = FlatStyle.Flat,
-                Font = new Font("Segoe UI", 9F, FontStyle.Bold),
+                Font = new Font(
+                    "Segoe UI",
+                    9F,
+                    FontStyle.Bold),
                 Cursor = Cursors.Hand,
                 UseVisualStyleBackColor = false
             };
@@ -2320,77 +2138,24 @@ namespace SmartBuss
             parent.Controls.Add(button);
         }
 
-        private Color GetStatusColor(
-            string status)
+        private Color GetStatusColor(string status)
         {
             if (status == "Παραδόθηκε")
             {
                 return Green;
             }
 
-            if (status == "Καθ’ οδόν")
+            if (status == "Προς παράδοση")
             {
                 return Blue;
             }
 
-            if (status == "Έτοιμη")
+            if (status == "Σε επεξεργασία")
             {
                 return Orange;
             }
 
             return TextDark;
-        }
-
-        private string GetPriorityText(
-            NotificationPriority priority)
-        {
-            if (priority == NotificationPriority.High)
-            {
-                return "ΥΨΗΛΗ";
-            }
-
-            return "ΚΑΝΟΝΙΚΗ";
-        }
-
-        private class CartItem
-        {
-            public string Name { get; set; }
-            public string Store { get; set; }
-            public decimal Price { get; set; }
-            public int Quantity { get; set; }
-        }
-
-        private class Order
-        {
-            public int Number { get; set; }
-            public string Store { get; set; }
-            public List<string> Items { get; set; }
-            public string DeliveryStop { get; set; }
-            public string Status { get; set; }
-            public DateTime CreatedAt { get; set; }
-            public decimal Total { get; set; }
-        }
-
-        private class DetectedObject
-        {
-            public string ObjectName { get; set; }
-            public string Details { get; set; }
-            public string Floor { get; set; }
-            public DateTime Time { get; set; }
-        }
-
-        private class NotificationItem
-        {
-            public string Title { get; set; }
-            public string Message { get; set; }
-            public NotificationPriority Priority { get; set; }
-            public DateTime Time { get; set; }
-        }
-
-        private enum NotificationPriority
-        {
-            Normal,
-            High
         }
     }
 }
