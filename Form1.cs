@@ -177,7 +177,7 @@ namespace SmartBuss
             {
                 Dock = DockStyle.Left,
                 Width = 215,
-                BackColor = Color.White,
+                BackColor = Theme.VividBlue,
                 Padding = new Padding(14, 20, 14, 15)
             };
 
@@ -185,7 +185,7 @@ namespace SmartBuss
             {
                 Text = "ΚΕΝΤΡΙΚΟ ΜΕΝΟΥ",
                 AutoSize = true,
-                ForeColor = TextMuted,
+                ForeColor = Color.White,
                 Font = new Font("Segoe UI", 8.5F, FontStyle.Bold),
                 Location = new Point(18, 20)
             };
@@ -262,7 +262,7 @@ namespace SmartBuss
                     "Διώροφο όχημα\n" +
                     "Τρέχουσα στάση: Ακρόπολη",
                 AutoSize = true,
-                ForeColor = TextMuted,
+                ForeColor = Color.White,
                 Font = new Font("Segoe UI", 8.5F),
                 Location = new Point(18, 465)
             };

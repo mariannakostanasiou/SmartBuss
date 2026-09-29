@@ -18,3 +18,5 @@ C:\Users\Admin\source\repos\SmartBuss\obj\Debug\SmartBuss.exe
 C:\Users\Admin\source\repos\SmartBuss\obj\Debug\SmartBuss.pdb
 C:\Users\maria\OneDrive\Έγγραφα\GitHub\SmartBuss\bin\Debug\SmartBussBackground.png
 C:\Users\maria\OneDrive\Έγγραφα\GitHub\SmartBuss\bin\Debug\SmartBussLogo.png
+C:\Users\Admin\source\repos\SmartBuss\bin\Debug\SmartBussBackground.png
+C:\Users\Admin\source\repos\SmartBuss\bin\Debug\SmartBussLogo.png
