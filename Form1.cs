@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Drawing;
 using System.Linq;
 using System.Windows.Forms;
+using Microsoft.VisualBasic;
 
 namespace SmartBuss
 {
@@ -214,7 +215,29 @@ namespace SmartBuss
             routeButton.Click += delegate { ShowRoutePage(); };
             ordersButton.Click += delegate { ShowOrderPage(); };
             trackingButton.Click += delegate { ShowOrderTrackingPage(); };
-            driverButton.Click += delegate { ShowDriverPage(); };
+            driverButton.Click += delegate
+            {
+                string password = Microsoft.VisualBasic.Interaction.InputBox(
+                    "Εισάγετε τον κωδικό πρόσβασης για την Οθόνη Οδηγού:",
+                    "Προστασία Πρόσβασης",
+                    "", -1, -1);
+
+                if (string.IsNullOrEmpty(password))
+                {
+                    return;
+                }
+
+                
+                if (password == "driver")
+                {     
+                    ShowDriverPage();
+                }
+                else
+                {
+                    
+                    MessageBox.Show("Λάθος κωδικός πρόσβασης!", "Αποτυχία σύνδεσης", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                }
+            };
             employeeButton.Click += delegate { ShowEmployeePage(); };
             robotButton.Click += delegate { ShowRobotPage(); };
             notificationsButton.Click += delegate { ShowNotificationsPage(); };
