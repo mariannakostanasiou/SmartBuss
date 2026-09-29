@@ -80,7 +80,7 @@ namespace SmartBuss
         {
             BackColor = Theme.Background;
             Font = new Font("Segoe UI", 10F);
-            Text = "SmartBuss - Έξυπνο Διώροφο Τουριστικό Λεωφορείο";
+            Text = "SmartBuss - Έξυπνο Τουριστικό Λεωφορείο";
             StartPosition = FormStartPosition.CenterScreen;
             MinimumSize = new Size(1050, 650);
         }
@@ -131,7 +131,7 @@ namespace SmartBuss
 
             Label subtitle = new Label
             {
-                Text = "Έξυπνο διώροφο τουριστικό λεωφορείο",
+                Text = "Έξυπνο τουριστικό λεωφορείο",
                 AutoSize = true,
                 ForeColor = Color.FromArgb(225, 238, 255),
                 Font = new Font("Segoe UI", 9.5F),
@@ -356,7 +356,7 @@ namespace SmartBuss
 
             PreparePage(
                 "Επισκόπηση διαδρομής",
-                "Η τρέχουσα κατάσταση του διώροφου λεωφορείου.");
+                "Η τρέχουσα κατάσταση του λεωφορείου.");
             contentPanel.BackgroundImageLayout = ImageLayout.Stretch;
             contentPanel.BackColor = Theme.VividBlue;
 
@@ -454,7 +454,7 @@ namespace SmartBuss
 
             Label systemInfo = CreateTextLabel(
                 "Η σύνδεση με το λεωφορείο είναι ενεργή. " +
-                "Οι δύο όροφοι και τα βασικά συστήματα λειτουργούν κανονικά.",
+                "Τα βασικά συστήματα λειτουργούν κανονικά.",
                 10,
                 Green);
             systemInfo.Location = new Point(22, 57);
@@ -475,7 +475,7 @@ namespace SmartBuss
                 "Πληροφορίες για τα σημεία ενδιαφέροντος κοντά στις στάσεις.");
 
             Panel routeCard = CreateCard(0, 100, 980, 140);
-            AddCardTitle(routeCard, "Η διαδρομή του διώροφου λεωφορείου");
+            AddCardTitle(routeCard, "Η διαδρομή του λεωφορείου");
 
             Label route = CreateTextLabel(
                 "Σύνταγμα → Ακρόπολη → Μουσείο → Εθνικός Κήπος → Παραλία",
@@ -1455,9 +1455,9 @@ namespace SmartBuss
                 DropDownStyle = ComboBoxStyle.DropDownList
             };
 
-            robotDurationComboBox.Items.Add("Γρήγορος - 5 λεπτά");
-            robotDurationComboBox.Items.Add("Κανονικός - 10 λεπτά");
-            robotDurationComboBox.Items.Add("Εντατικός - 20 λεπτά");
+            robotDurationComboBox.Items.Add("5 λεπτά");
+            robotDurationComboBox.Items.Add("10 λεπτά");
+            robotDurationComboBox.Items.Add("20 λεπτά");
             robotDurationComboBox.SelectedIndex = 1;
 
             Label zonesLabel = CreateTextLabel(
@@ -1479,7 +1479,7 @@ namespace SmartBuss
             robotZonesCheckedListBox.Items.Add("Καθίσματα πάνω ορόφου");
             robotZonesCheckedListBox.Items.Add("Διάδρομοι");
             robotZonesCheckedListBox.Items.Add("Σκάλα");
-            robotZonesCheckedListBox.Items.Add("Περιοχή οδηγού");
+            
 
             Button startButton = CreatePrimaryButton("Έναρξη αποστολής");
             startButton.Location = new Point(22, 425);
@@ -1987,23 +1987,27 @@ namespace SmartBuss
                 ForeColor = TextDark,
                 Font = new Font("Segoe UI", 10.5F),
                 Text =
-                    "Επιβάτης\n\n" +
-                    "Το λεωφορείο διαθέτει κάτω και πάνω όροφο.\n" +
-                    "Από τη «Διαδρομή» ενημερώνεστε για τα αξιοθέατα.\n" +
-                    "Από τις «Παραγγελίες» επιλέγετε προϊόντα από συνεργαζόμενα καταστήματα.\n" +
-                    "Η πληρωμή γίνεται με εικονική κάρτα και η παραγγελία\n" +
-                    "παραδίδεται σε επόμενη στάση.\n\n" +
-                    "Κατάσταση παραγγελίας\n\n" +
-                    "Η κατάσταση αλλάζει αυτόματα κάθε 10 δευτερόλεπτα:\n" +
-                    "«Σε επεξεργασία» → «Προς παράδοση» → «Παραδόθηκε».\n\n" +
-                    "Ρομπότ καθαρισμού\n\n" +
-                    "Ο τεχνικός επιλέγει κάτω όροφο, πάνω όροφο, περιοχή οδηγού,\n" +
-                    "σκάλα ή όλο το λεωφορείο. Επιλέγει επίσης σημεία καθαρισμού,\n" +
-                    "μέθοδο και χρόνο ολοκλήρωσης.\n" +
-                    "Το ρομπότ αναπτύσσει τα πόδια του, μετακινείται και καθαρίζει.\n" +
-                    "Σε κάθε αποστολή μπορεί να αναγνωρίσει ένα αντικείμενο αξίας.\n\n" +
-                    "Οι ειδοποιήσεις ενημερώνουν τον οδηγό, την εταιρεία και τους επιβάτες.\n\n" +
-                    "Σημείωση: Η εφαρμογή είναι εκπαιδευτική προσομοίωση."
+                    "Καλώς ήρθατε στο SmartBuss.\n\n" +
+
+                    "Από το μενού στα αριστερά μπορείτε να δείτε τη διαδρομή, " +
+                    "να ενημερωθείτε για τα αξιοθέατα και να κάνετε μια παραγγελία " +
+                    "από τα συνεργαζόμενα καταστήματα.\n\n" +
+                    "Για να κάνετε παραγγελία, επιλέξτε ένα προϊόν, προσθέστε το " +
+                    "στο καλάθι και συνεχίστε στην πληρωμή. Η παραγγελία σας " +
+                    "παραδίδεται σε μία επόμενη στάση της επιλογής σας.\n\n" +
+                    "Ο πίνακας οδηγού δείχνει την ταχύτητα, τη θερμοκρασία και " +
+                    "την κατάσταση των θυρών. Από εκεί μπορεί να γίνει και ένας " +
+                    "βασικός έλεγχος πριν την αναχώρηση.\n\n" +
+
+                    "Στον τεχνικό έλεγχο μπορείτε να δείτε την ενέργεια του οχήματος " +
+                    "και να ρυθμίσετε την οροφή σύμφωνα με τον καιρό.\n\n" +
+
+                    "Για το ρομπότ καθαρισμού επιλέξτε την περιοχή, τα σημεία και " +
+                    "τον τρόπο καθαρισμού. Στη συνέχεια πατήστε «Έναρξη αποστολής» " +
+                    "και παρακολουθήστε την πρόοδο.\n\n" +
+
+                    "Αν το ρομπότ εντοπίσει κάποιο σημαντικό αντικείμενο, θα εμφανιστεί " +
+                    "σχετική ειδοποίηση στην αντίστοιχη οθόνη.\n\n" 
             };
 
             helpCard.Controls.Add(helpText);
