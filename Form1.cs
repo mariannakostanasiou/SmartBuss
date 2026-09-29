@@ -831,12 +831,15 @@ namespace SmartBuss
                     Location = new Point(30, 100)
                 };
 
+
                 TextBox cardBox = new TextBox
                 {
                     Location = new Point(30, 122),
                     Width = 330,
                     MaxLength = 19
                 };
+
+                cardBox.KeyPress += OnlyNumbers_KeyPress;
 
                 Label expiryLabel = new Label
                 {
@@ -852,6 +855,8 @@ namespace SmartBuss
                     MaxLength = 5
                 };
 
+                expiryBox.KeyPress += OnlyNumbers_KeyPress;
+
                 Label cvvLabel = new Label
                 {
                     Text = "CVV",
@@ -866,6 +871,8 @@ namespace SmartBuss
                     MaxLength = 3,
                     PasswordChar = '*'
                 };
+
+                cvvBox.KeyPress += OnlyNumbers_KeyPress;
 
                 Button payButton = CreatePrimaryButton("Πληρωμή");
                 payButton.Location = new Point(30, 250);
@@ -910,6 +917,14 @@ namespace SmartBuss
 
                 return paymentForm.ShowDialog(this) ==
                        DialogResult.OK;
+            }
+        }
+
+        private void OnlyNumbers_KeyPress(object sender, KeyPressEventArgs e)
+        {
+            if (!char.IsControl(e.KeyChar) && !char.IsDigit(e.KeyChar))
+            {
+                e.Handled = true; 
             }
         }
 

@@ -5,8 +5,8 @@ namespace SmartBuss
 {
     public class RobotService
     {
+        private bool objectAlreadyDetected = false;
         private readonly Random random;
-        private bool objectAlreadyDetected;
 
         public RobotState State { get; private set; }
 
@@ -67,6 +67,7 @@ namespace SmartBuss
             State.Status = RobotStatus.Paused;
         }
 
+
         public void AdvanceOneSecond()
         {
             if (State.Status == RobotStatus.Idle ||
@@ -122,8 +123,14 @@ namespace SmartBuss
             }
         }
 
+
         private void DetectOneObjectIfNeeded()
         {
+            if (availableObjects == null || availableObjects.Count == 0)
+            {
+                return;
+            }
+
             if (objectAlreadyDetected)
             {
                 return;
@@ -131,10 +138,13 @@ namespace SmartBuss
 
             objectAlreadyDetected = true;
 
+            Random rand = new Random();
+            int index = rand.Next(availableObjects.Count);
+
             DetectedObject detectedObject = new DetectedObject
             {
-                ObjectName = "Διαβατήριο",
-                Details = "Εντοπίστηκε κάτω από κάθισμα.",
+                ObjectName = availableObjects[index].ObjectName,
+                Details = availableObjects[index].Details,
                 Area = State.Area,
                 Time = DateTime.Now
             };
@@ -146,6 +156,18 @@ namespace SmartBuss
                     new DetectedObjectEventArgs(detectedObject));
             }
         }
+
+        
+        private List<DetectedObject> availableObjects = new List<DetectedObject>
+        {
+            new DetectedObject { ObjectName = "Διαβατήριο", Details = "Εντοπίστηκε κάτω από κάθισμα." },
+            new DetectedObject { ObjectName = "Πορτοφόλι", Details = "Βρέθηκε ξεχασμένο σε θήκη καθίσματος." },
+            new DetectedObject { ObjectName = "Smartphone", Details = "Εντοπίστηκε στον διάδρομο." },
+            new DetectedObject { ObjectName = "Ακουστικά Bluetooth", Details = "Βρέθηκαν κάτω από το κάθισμα." },
+            new DetectedObject { ObjectName = "Γυαλιά Ηλίου", Details = "Εντοπίστηκαν στο ράφι αποσκευών." },
+                new DetectedObject { ObjectName = "Πλαστικό Μπουκάλι", Details = "Απόρριμμα εντοπίστηκε στον διάδρομο." }
+        };
+
 
         public string GetLocationDescription()
         {
